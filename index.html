@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>My Webpage</title>
+        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"
+        integrity="sha512-xodZBNTC5n17Xt2atTPuE1HxjVMSvLVW9ocqUKLsCC5CXdbqCmblAshOMAS6/keqq/sMZMZ19scR4PsZChSR7A=="
+        crossorigin=""/>
+        <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"
+        integrity="sha512-XQoYMqMTK8LvdxXYG3nZ448hOEQiglfqkJs1NOQV44cWnUrBc8PkAOcXy20w0vlaXaVUearIOBhiXZ5V3ynxwA=="
+        crossorigin=""></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"type="text/javascript"></script>
+    </head>
+    <style>
+      #map {
+        height: 500px;
+        width: 500px;
+      }
+    </style>
+    <script type = "text/javascript" language ="javascript">
+    var mqtt
+    var reconnectTimeout = 2000;
+    //document.getElementById("status").innerHTML = "Not connected. Please fill in an active server and port number to connect.";
+    //var host="ws://broker.emqx.io:8083/mqtt";
+    //var port = 8083;
+    function connectFailure (message) {
+      document.getElementById("alert").innerHTML = "Failed to connect to host. Please try again."
+      console.log("Failed to connect to host: "+host)
+      setTimeout(MQTTconnect, reconnectTimeout);
+    }
+    //function onMessageArrived(msg) {
+      //out_msg = "Message received "+msg.payloadString+"<br>"
+    //}
+    function sub_topic() {
+      console.log(cflag)
+      document.getElementById("alert").innerHTML = "";
+      if (cflag = 0) {
+        document.getElementById("alert").innerHTML = "Not connected to a server. Please try again once you connect to a server."
+        console.log("Not connected to a server. Please try again once you connect to a server.")
+        return false;
+      }
+      var subscribed_topic = document.getElementById("subscribe_topic").value;
+      mqtt.subscribe(subscribed_topic)
+      document.getElementById("alert").innerHTML = "You have subscribed to the topic: "+subscribed_topic;
+      msg = "You have subscribed to this database."
+      message = new Paho.MQTT.Message(msg);
+      message.destinationName = subscribed_topic;
+      mqtt.send(message)
+      cflag = 1;
+      return false;
+    }
+    function onConnect() {
+      console.log("Connected.");
+      document.getElementById("status").innerHTML = "You are currently connected to a database.";
+      //document.getElementById("alert").innerHTML = "Connected to "+ server + " port # "+ port ;
+      cflag = 1;
+    }
+    function MQTTconnect() {
+      document.getElementById("status").innerHTML = "";
+      var server = document.getElementById("server").value;
+      var port = document.getElementById("port").value;
+      console.log("Connecting to "+ server +" with port #"+ port);
+      var host = "ws://"+server+":"+port+"/mqtt";
+      mqtt = new Paho.MQTT.Client(host,"testtklab");
+      var options = {
+        timeout: 3000,
+        onSuccess: onConnect,
+        onFailure: connectFailure,
+      };
+      mqtt.onConnectionLost = lostconnection;
+      mqtt.connect(options);
+      return false;
+    }
+    function lostconnection () {
+      console.log("Connection has been lost to the server.")
+      document.getElementById("status") = "Disconnected from server."
+      cflag = 0;
+    }
+    function sendmsg() {
+      if (cflag==0) {
+        document.getElementById("alert").innerHTML = "Cannot send message, as you are not connected to a server.";
+        console.log("Cannot send message, as you are not connected to a server.")
+        return false;
+      }
+      var topic = document.getElementById("topic").value
+      if (topic=='') {
+        document.getElementById("alert").innerHTML = "You must enter a topic before sending a message.";
+        console.log("Did not enter a topic.")
+        return false;
+      }
+      var msg = document.getElementById("smessage").value;
+      message = new Paho.MQTT.Message(msg);
+      message.destinationName = topic;
+      mqtt.send(message)
+      console.log("Message: --"+msg+"-- was sent to the connected server and in the topic " +topic)
+      document.getElementById("alert").innerHTML = "Message sent: "+msg;
+      return false;
+    }
+    </script>
+    <body>
+      <p id="status">Not connected. Please fill in an active server and port number to connect.</p>
+      <form onsubmit="return MQTTconnect()">
+        <label for="server">Server:</label><br>
+        <input type="text" id="server"><br>
+        <label for="port">Port:</label><br>
+        <input type="number" id="port"><br>
+        <input type="submit" value="Connect">
+      </form>
+      <form onsubmit="return sub_topic()">
+        <label for="subscribe_topic">Subscribe to topic:</label><br>
+        <input type="text" id="subscribe_topic"><br>
+        <input type="submit" value="Subscribe"><br>
+      </form>
+      <form onsubmit="return sendmsg()">
+        <label for="topic">Topic:</label><br>
+        <input type="text" id="topic"><br>
+        <label for="smessage">Message:</label><br>
+        <input type="text" id="smessage"><br>
+        <input type="submit" value="Submit Message"><br>
+      <p id="alert"></p>
+      </form>
+      <div id="map">
+      </div>
+      <p>Click the button to get your coordinates.</p>
+
+      <button onclick="getLocation()">Try It</button>
+
+      <p id="demo"></p>
+      <script>
+        // Map
+        const map = L.map('map').setView([51.0447,-114.0719],9);
+        const attribution = 'Map data &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, Imagery © <a href="https://www.mapbox.com/">Mapbox</a>';
+        const tileUrl = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
+        const tiles = L.tileLayer(tileUrl, { attribution });
+        tiles.addTo(map);
+        var geo = navigator.geolocation;
+        var x = document.getElementById("demo");
+        function getLocation() {
+          if (geo) {
+            geo.getCurrentPosition(showPosition, showError);
+          } else {
+            x.innerHTML = "Geolocation is not supported by this browser."
+          }
+        }
+        function showPosition(position) {
+          x.innerHTML ="Latitude: " + position.coords.latitude + "<br>Longitude: " + position.coords.longitude;
+          message = new Paho.MQTT.Message("Latitude: " + position.coords.latitude + "<br>Longitude: " + position.coords.longitude)
+          message.destinationName = "location";
+          mqtt.send(message)
+          var marker = L.marker([position.coords.latitude,position.coords.longitude]).addTo(map);
+          marker.bindPopup("<b>Latitude: </b>"+ position.coords.latitude + "<br><b>Longitude: </b>"+ position.coords.longitude).openPopup();
+        }
+        function showError(error) {
+          switch(error.code) {
+            case error.PERMISSION_DENIED:
+              x.innerHTML = "Request for location data was denied."
+              break;
+            case error.POSITION_UNAVAILABLE:
+              x.innerHTML = "Device is unable to provide geolocation data."
+              break;
+            case error.TIMEOUT:
+              x.innerHTML = "Request for location data timeouted."
+              break;
+            case error.UNKNOWN_ERROR:
+              x.innerHTML = "An unknown error occurred."
+              break;
+          }
+        }
+      </script>
+    </body>
+  </html>
