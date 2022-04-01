@@ -21,10 +21,23 @@
     <script type = "text/javascript" language ="javascript">
     var mqtt
     var reconnectTimeout = 2000;
+    function disconnect() {
+      if (cflag==0) {
+        document.getElementById("alert").innerHTML = "You are not connected to a database, therefore there is no server to disconnect from."
+      }
+      else if (cflag==1) {
+        mqtt.disconnect()
+      }
+    }
     function connectFailure (message) {
       document.getElementById("alert").innerHTML = "Failed to connect to host. Please try again."
       console.log("Failed to connect to host: "+host)
       setTimeout(MQTTconnect, reconnectTimeout);
+    }
+    function onMessageArrived (message) {
+      out_msg = message.payloadString;
+      document.getElementById("alert").innerHTML = "Message received: "+out_msg;
+      return false;
     }
     function sub_topic() {
       console.log(cflag)
@@ -69,7 +82,8 @@
     }
     function lostconnection () {
       console.log("Connection has been lost to the server.")
-      document.getElementById("status") = "Disconnected from server."
+      document.getElementById("status").innerHTML = "Not connected. Please fill in an active server and port number to connect."
+      document.getElementById("alert").innerHTML = "Disconnected from server."
       cflag = 0;
     }
     function sendmsg() {
@@ -95,13 +109,14 @@
     </script>
     <body>
       <p id="status">Not connected. Please fill in an active server and port number to connect.</p>
-      <form onsubmit="return MQTTconnect()">
+      <form onsubmit="return MQTTconnect()" id="connectform">
         <label for="server">Server:</label><br>
         <input type="text" id="server"><br>
         <label for="port">Port:</label><br>
         <input type="number" id="port"><br>
         <input type="submit" value="Connect">
       </form>
+      <button onclick="disconnect()">Disconnect</button>
       <form onsubmit="return sub_topic()">
         <label for="subscribe_topic">Subscribe to topic:</label><br>
         <input type="text" id="subscribe_topic"><br>
@@ -119,7 +134,7 @@
       </div>
       <p>Click the button below to pinpoint your location on the map. A random temperature value will also be assigned to your location.</p>
 
-      <button onclick="getLocation()">Locate</button>
+      <button onclick="getLocation()" id="geolocate">Locate</button>
 
       <p id="errorgen"></p>
       <script>
@@ -140,7 +155,7 @@
           }
         }
         function showPosition(position) {
-          temperature = Math.round(Math.random() * (60 - (-40)) + (-40));
+          var temperature = Math.round(Math.random() * (60 - (-40)) + (-40));
           //Found on github, leaflet-color-markers: https://github.com/pointhi/leaflet-color-markers
           var blueIcon = new L.Icon({
             iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png',
@@ -176,12 +191,18 @@
           else {
             markerColor = greenIcon
           }
-          message = new Paho.MQTT.Message("Latitude: " + position.coords.latitude + "<br>Longitude: " + position.coords.longitude + "<br>Temperature:" + temperature + "degrees Celsius")
-          message.destinationName = "ENGG651/Taylor_Kirschner/my_temperature";
+          var jsonmsg = JSON.stringify({ latitude: position.coords.latitude, longitude: position.coords.longitude, temperature: temperature});
+          message = new Paho.MQTT.Message(jsonmsg)
+          message.destinationName = "ENGO651/Taylor_Kirschner/my_temperature";
           mqtt.send(message)
-          var marker = L.marker([position.coords.latitude,position.coords.longitude], {icon: markerColor}).addTo(map);
-          L.icon({'marker-color': markerColor})
-          marker.bindPopup("<b>Latitude: </b>"+ position.coords.latitude + "<br><b>Longitude: </b>"+ position.coords.longitude + "<br><b>Temperature: </b>"+ temperature + "degrees Celsius").openPopup();
+          setInterval(function() {
+          }, 1000);
+          onMessageArrived(message);
+          var obj = JSON.parse(out_msg);
+          var marker = L.marker([obj.latitude, obj.longitude], {icon: markerColor}).addTo(map);
+          marker.bindPopup("<b>Latitude: </b>"+ obj.latitude + "<br><b>Longitude: </b>"+ obj.longitude + "<br><b>Temperature: </b>"+ obj.temperature + " degrees Celsius").openPopup();
+        }
+        function createmarker() {
         }
         function showError(error) {
           switch(error.code) {
