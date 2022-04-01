@@ -21,17 +21,11 @@
     <script type = "text/javascript" language ="javascript">
     var mqtt
     var reconnectTimeout = 2000;
-    //document.getElementById("status").innerHTML = "Not connected. Please fill in an active server and port number to connect.";
-    //var host="ws://broker.emqx.io:8083/mqtt";
-    //var port = 8083;
     function connectFailure (message) {
       document.getElementById("alert").innerHTML = "Failed to connect to host. Please try again."
       console.log("Failed to connect to host: "+host)
       setTimeout(MQTTconnect, reconnectTimeout);
     }
-    //function onMessageArrived(msg) {
-      //out_msg = "Message received "+msg.payloadString+"<br>"
-    //}
     function sub_topic() {
       console.log(cflag)
       document.getElementById("alert").innerHTML = "";
@@ -53,17 +47,17 @@
     function onConnect() {
       console.log("Connected.");
       document.getElementById("status").innerHTML = "You are currently connected to a database.";
-      //document.getElementById("alert").innerHTML = "Connected to "+ server + " port # "+ port ;
       cflag = 1;
       return false;
     }
     function MQTTconnect() {
       document.getElementById("status").innerHTML = "";
       var server = document.getElementById("server").value;
-      var port = document.getElementById("port").value;
+      var port = parseInt(document.getElementById("port").value);
+      var x=Math.floor((Math.random() * 100000)+1);
+      var client="testuser-"+x;
       console.log("Connecting to "+ server +" with port #"+ port);
-      var host = "ws://"+server+":"+port+"/mqtt";
-      mqtt = new Paho.MQTT.Client(host,"testtklab");
+      mqtt = new Paho.MQTT.Client(server,port,client);
       var options = {
         timeout: 3000,
         onSuccess: onConnect,
@@ -129,6 +123,7 @@
 
       <p id="demo"></p>
       <script>
+      var cflag = 0;
         // Map
         const map = L.map('map').setView([51.0447,-114.0719],9);
         const attribution = 'Map data &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, Imagery © <a href="https://www.mapbox.com/">Mapbox</a>';
